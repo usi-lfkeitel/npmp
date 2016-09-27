@@ -8,7 +8,7 @@ import (
 
 //go:generate stringer -type=OptionCode,MessageType,DataType,NACKResponseCode,NetType
 
-var MagicCookie = []byte{'P', 'M'}
+var MagicCookie = []byte(`PM`)
 
 type Option struct {
 	Code  OptionCode
@@ -102,29 +102,29 @@ type StartMessage struct {
 }
 
 func (p StartMessage) JobID() []byte      { return p.Message[4:8] }
-func (p StartMessage) SetJobID(id uint32) { binary.LittleEndian.PutUint32(p.JobID(), id) }
+func (p StartMessage) SetJobID(id []byte) { copy(p.JobID(), id) }
 
 type EndMessage struct {
 	Message
 }
 
 func (p EndMessage) JobID() []byte      { return p.Message[4:8] }
-func (p EndMessage) SetJobID(id uint32) { binary.LittleEndian.PutUint32(p.JobID(), id) }
+func (p EndMessage) SetJobID(id []byte) { copy(p.JobID(), id) }
 
 type DataMessage struct {
 	Message
 }
 
 func (p DataMessage) JobID() []byte      { return p.Message[4:8] }
-func (p DataMessage) SetJobID(id uint32) { binary.LittleEndian.PutUint32(p.JobID(), id) }
+func (p DataMessage) SetJobID(id []byte) { copy(p.JobID(), id) }
 
-func (p DataMessage) Type() byte             { return p.Message[8] }
+func (p DataMessage) Type() DataType         { return DataType(p.Message[8]) }
 func (p DataMessage) SetDataType(t DataType) { p.Message[8] = byte(t) }
 
 func (p DataMessage) Data() []byte {
 	return p.Message[9:]
 }
-func (p DataMessage) SetData(d []byte) {
+func (p *DataMessage) SetData(d []byte) {
 	p.Message = append(p.Message[:9], d...)
 }
 
@@ -132,7 +132,14 @@ type InformMessage struct {
 	Message
 }
 
-func (p InformMessage) Options() []byte         { return p.Message[4:] }
+func (p InformMessage) Options() []OptionCode {
+	opts := p.Message[4:]
+	o := make([]OptionCode, len(opts))
+	for i, opt := range opts {
+		o[i] = OptionCode(opt)
+	}
+	return o
+}
 func (p *InformMessage) SetOption(o OptionCode) { p.Message = append(p.Message, byte(o)) }
 func (p *InformMessage) SetOptions(o []OptionCode) {
 	p.Message = p.Message[:4] // Remove everything after the header
@@ -172,6 +179,11 @@ func (p *SettingsMessage) AddOption(o Option) {
 		p.Options = make([]Option, 0)
 	}
 	p.Options = append(p.Options, o)
+}
+
+func (p *SettingsMessage) StripOptions() {
+	p.Message = p.Message[:4]
+	p.Options = nil
 }
 
 func (p *SettingsMessage) Bytes() []byte {
