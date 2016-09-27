@@ -7,7 +7,7 @@ import (
 )
 
 func TestBaseMessage(t *testing.T) {
-	m := NewMessage(Null)
+	m := newMessage(Null)
 	if m.MessageType() != Null {
 		t.Fatalf("Incorrect message type. Expected Null, got %s", m.MessageType().String())
 	}

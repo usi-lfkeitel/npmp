@@ -8,22 +8,29 @@ import (
 
 //go:generate stringer -type=OptionCode,MessageType,DataType,NACKResponseCode,NetType
 
+// The MagicCookie is used as part of the protocol. It's recommended to only
+// change this if you're using a customized version of the protocol.
 var MagicCookie = []byte(`PM`)
 
+// An Option is given in a Settings message.
 type Option struct {
 	Code  OptionCode
 	Value []byte
 }
 
-type OptionCode byte
-type MessageType byte
-type DataType byte
-type NACKResponseCode byte
+type OptionCode byte       // An OptionCode is used in both Inform and Settings messages.
+type MessageType byte      // MessageType determines how a message should be processed.
+type DataType byte         // DataType is used in a Data message.
+type NACKResponseCode byte // NACKResponseCode is used in a NAK message.
 
+// Messanger is an interface to allow all Message types to be reduced to their
+// []byte representations.
 type Messanger interface {
 	Bytes() []byte
 }
 
+// A Message is the base form. It only contains a header. To use it as a different
+// message type, it must be encapsulated within that type.
 type Message []byte
 
 func (p Message) Version() byte            { return p[0] }
@@ -59,7 +66,7 @@ func (p *RegisterMessage) SetClientID(id []byte) { copy(p.ClientID(), id) }
 func (p *RegisterMessage) IfCount() byte         { return p.Message[20] }
 func (p *RegisterMessage) Process() error {
 	c := int(p.IfCount())
-
+	// base header + Register message header + 11 bytes per interface
 	if len(p.Message) < 4+17+(11*c) {
 		return errors.New("REGISTER message too small")
 	}
@@ -86,13 +93,13 @@ func (p *RegisterMessage) AddInterface(i *NetInterface) {
 }
 
 func (p *RegisterMessage) Bytes() []byte {
-	ret := p.Message[:4]
-	ret = append(ret, p.ClientID()...)
-	ret = append(ret, byte(len(p.Interfaces)))
-	for _, i := range p.Interfaces {
-		ret = append(ret, byte(i.Type))
-		ret = append(ret, []byte(i.Haddr)...)
-		ret = append(ret, []byte(i.IPAddr.To4())...)
+	ret := p.Message[:4]                       // Base header
+	ret = append(ret, p.ClientID()...)         // Add client ID
+	ret = append(ret, byte(len(p.Interfaces))) // Add number of interfaces
+	for _, i := range p.Interfaces {           // Add interfaces
+		ret = append(ret, byte(i.Type))              // Add interface type
+		ret = append(ret, []byte(i.Haddr)...)        // Add interface MAC address
+		ret = append(ret, []byte(i.IPAddr.To4())...) // Add interface IP address
 	}
 	return ret
 }
@@ -133,9 +140,9 @@ type InformMessage struct {
 }
 
 func (p InformMessage) Options() []OptionCode {
-	opts := p.Message[4:]
+	opts := p.Message[4:] // Strip header
 	o := make([]OptionCode, len(opts))
-	for i, opt := range opts {
+	for i, opt := range opts { // Cast all bytes as OptionCode
 		o[i] = OptionCode(opt)
 	}
 	return o
@@ -161,15 +168,15 @@ type SettingsMessage struct {
 }
 
 func (p *SettingsMessage) Process() error {
-	start := 4
+	start := 4 // Starting offset of first Option
 	p.Options = make([]Option, 0)
 	for start < len(p.Message) {
-		len := binary.LittleEndian.Uint32(p.Message[5:9])
+		len := binary.LittleEndian.Uint32(p.Message[5:9]) // Option length
 		p.Options = append(p.Options, Option{
 			Code:  OptionCode(p.Message[start]),
 			Value: p.Message[9:len],
-		})
-		start = start + 5 + int(len)
+		}) // Add Option
+		start = start + 5 + int(len) // Starting offset + Option header + length of option
 	}
 	return nil
 }
@@ -187,14 +194,14 @@ func (p *SettingsMessage) StripOptions() {
 }
 
 func (p *SettingsMessage) Bytes() []byte {
-	ret := p.Message[:4]
-	l := make([]byte, 4)
+	ret := p.Message[:4] // Base header
+	l := make([]byte, 4) // Used to encode option length
 	for _, o := range p.Options {
 		// Lengths are 4 bytes long, must encode a slice of bytes
 		binary.LittleEndian.PutUint32(l, uint32(len(o.Value)))
-		ret = append(ret, byte(o.Code))
-		ret = append(ret, l...)
-		ret = append(ret, o.Value...)
+		ret = append(ret, byte(o.Code)) // Add Option code
+		ret = append(ret, l...)         // Add Option length
+		ret = append(ret, o.Value...)   // Add Option data
 	}
 	return ret
 }

@@ -2,7 +2,10 @@ package npmp
 
 import "errors"
 
-func NewMessage(mt MessageType) Message {
+// newMessage will return a base Message of type mt. This function
+// is for internal use only. Many message types require a slightly
+// larger base.
+func newMessage(mt MessageType) Message {
 	m := Message(make([]byte, 4))
 	m.SetVersion(0)
 	m.SetCookie(MagicCookie)
@@ -10,6 +13,7 @@ func NewMessage(mt MessageType) Message {
 	return m
 }
 
+// NewRegisterMessage returns a RegisterMessage with no interface information.
 func NewRegisterMessage() *RegisterMessage {
 	p := Message(make([]byte, 21))
 	p.SetVersion(0)
@@ -18,14 +22,17 @@ func NewRegisterMessage() *RegisterMessage {
 	return &RegisterMessage{Message: p}
 }
 
+// NewSettingsMessage returns a Settings Message with no Options.
 func NewSettingsMessage() *SettingsMessage {
-	return &SettingsMessage{Message: NewMessage(Settings)}
+	return &SettingsMessage{Message: newMessage(Settings)}
 }
 
+// NewDisconnectMessage returns a Message of type Disconnect.
 func NewDisconnectMessage() Message {
-	return NewMessage(Disconnect)
+	return newMessage(Disconnect)
 }
 
+// NewStartMessage returns a StartMessage with a zeroed job ID.
 func NewStartMessage() StartMessage {
 	p := Message(make([]byte, 8))
 	p.SetVersion(0)
@@ -34,6 +41,7 @@ func NewStartMessage() StartMessage {
 	return StartMessage{p}
 }
 
+// NewEndMessage returns a EndMessage with a zeroed job ID.
 func NewEndMessage() EndMessage {
 	p := Message(make([]byte, 8))
 	p.SetVersion(0)
@@ -42,6 +50,7 @@ func NewEndMessage() EndMessage {
 	return EndMessage{p}
 }
 
+// NewDataMessage returns a DataMessage with no data.
 func NewDataMessage() DataMessage {
 	p := Message(make([]byte, 9))
 	p.SetVersion(0)
@@ -50,18 +59,22 @@ func NewDataMessage() DataMessage {
 	return DataMessage{p}
 }
 
+// NewInformMessage returns an InformMessage with no option codes.
 func NewInformMessage() InformMessage {
-	return InformMessage{NewMessage(Inform)}
+	return InformMessage{newMessage(Inform)}
 }
 
+// NewVersionMessage returns a Message with type Version.
 func NewVersionMessage() Message {
-	return NewMessage(Version)
+	return newMessage(Version)
 }
 
+// NewACKMessage returns a Message with type ACK.
 func NewACKMessage() Message {
-	return NewMessage(ACK)
+	return newMessage(ACK)
 }
 
+// NewNAKMessage returns an NAKMessage with a response code of 0.
 func NewNAKMessage() NAKMessage {
 	p := Message(make([]byte, 5))
 	p.SetVersion(0)
@@ -70,6 +83,10 @@ func NewNAKMessage() NAKMessage {
 	return NAKMessage{p}
 }
 
+// ConvertToRegister will take a Message and convert it into a RegisterMessage.
+// It calles the Process() method on the RegisterMessage which parses the
+// network interface information within the message. This is more of a
+// convenience function.
 func ConvertToRegister(p Message) (*RegisterMessage, error) {
 	if p.MessageType() != Register {
 		return nil, errors.New("Incorrect message type")
@@ -82,6 +99,9 @@ func ConvertToRegister(p Message) (*RegisterMessage, error) {
 	return r, nil
 }
 
+// ConvertToSettings will take a Message and convert it into a SettingsMessage.
+// It calles the Process() method on the SettingsMessage which parses the
+// Option data within the message. This is more of a convenience function.
 func ConvertToSettings(p Message) (*SettingsMessage, error) {
 	if p.MessageType() != Settings {
 		return nil, errors.New("Incorrect message type")
